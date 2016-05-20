@@ -1,5 +1,7 @@
 package com.github.wangshichun.tools.zookeeper;
 
+import com.google.common.base.Splitter;
+import com.sun.deploy.util.StringUtils;
 import org.apache.zookeeper.data.Stat;
 
 import javax.swing.*;
@@ -13,6 +15,8 @@ import javax.swing.text.AttributeSet;
 import javax.swing.text.html.HTML;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 
@@ -44,7 +48,7 @@ public class Main extends JFrame {
     public Main() {
         setTitle("zookeeper工具");
         setSize(850, 750);
-//        setExtendedState(MAXIMIZED_BOTH);
+        setExtendedState(MAXIMIZED_BOTH);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
         GridBagLayout layout = new GridBagLayout();
@@ -55,10 +59,10 @@ public class Main extends JFrame {
         setConstraints(2, 1, true, 1.0, null, layout, headPanel);
         initHeadPanel(headPanel);
 
-//        JPanel subHeadPanel1 = new JPanel();
-//        getContentPane().add(subHeadPanel1);
-//        setConstraints(2, 1, true, 1.0, null, layout, subHeadPanel1);
-        initSubHeadPanel1(headPanel);
+        JPanel subHeadPanel1 = new JPanel();
+        getContentPane().add(subHeadPanel1);
+        setConstraints(2, 1, true, 1.0, null, layout, subHeadPanel1);
+        initSubHeadPanel1(subHeadPanel1);
 
         JPanel subHeadPanel = new JPanel();
         getContentPane().add(subHeadPanel);
@@ -156,13 +160,25 @@ public class Main extends JFrame {
                 editorPane.setContentType("text/html");
                 StringBuilder builder = new StringBuilder();
                 builder.append("<html><body>");
-                for (String ch : children) {
-                    if (ch.contains(pathFilter))
-                        builder.append("<a path=\"").append(path).append(path.endsWith("/") ? "" : "/").append(ch).append("\"").append(" href=\"\">").append(ch).append("</a><br/>");
+                boolean isDubbo = path.contains("/dubbo") && (path.endsWith("/providers") || path.endsWith("/consumers"));
+
+                try {
+                    for (String ch : children) {
+                        if (ch.contains(pathFilter)) {
+                            String value = ch;
+                            if (isDubbo) {
+                                value = URLDecoder.decode(ch, StandardCharsets.UTF_8.name());
+                                value = StringUtils.join(Splitter.fixedLength(100).splitToList(value), "<br/>");
+                            }
+                            builder.append("\n<a path=\"").append(path).append(path.endsWith("/") ? "" : "/").append(ch).append("\"").append(" href=\"\">").append(value).append("</a><br/>").append(isDubbo ? "<br/>" : "");
+                        }
+                    }
+                    builder.append("</body></html>");
+                    System.out.println(builder.toString());
+                    editorPane.setText(builder.toString());
+                } catch (UnsupportedEncodingException e) {
+                    e.printStackTrace();
                 }
-                builder.append("</body></html>");
-                System.out.println(builder.toString());
-                editorPane.setText(builder.toString());
             }
         };
     }
@@ -372,7 +388,7 @@ public class Main extends JFrame {
 
         // 查看的路径chroot
         final JTextField chRootTextField = new JTextField("/");
-        chRootTextField.setColumns(20);
+        chRootTextField.setColumns(45);
         headPanel.add(chRootTextField);
 
         final JButton viewButton = new JButton("查看");
