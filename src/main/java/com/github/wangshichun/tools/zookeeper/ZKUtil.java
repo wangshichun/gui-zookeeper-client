@@ -7,6 +7,7 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 
 /**
@@ -41,6 +42,10 @@ public class ZKUtil {
         if (client != null)
             client.close();
         client = null;
+    }
+
+    public boolean isAlreadyInit() {
+        return alreadyInit;
     }
 
     public Stat exists(String path) {
@@ -93,7 +98,11 @@ public class ZKUtil {
         try {
             if (null == data || data.length == 0)
                 data = new byte[0];
-            return client.setData().forPath(path, data) + " 数据设置成功";
+            Stat stat = client.setData().forPath(path, data);
+            if (stat != null && stat.getDataLength() == data.length)
+                return  "数据设置成功";
+            else
+                return  "数据设置失败：" + stat;
         } catch (KeeperException.NoNodeException e) {
             return "节点不存在";
         } catch (Exception e) {
@@ -110,6 +119,6 @@ public class ZKUtil {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return null;
+        return new LinkedList<>();
     }
 }

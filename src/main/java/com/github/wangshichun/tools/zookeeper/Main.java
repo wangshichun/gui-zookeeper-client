@@ -32,6 +32,9 @@ public class Main extends JFrame {
     private Runnable setPathRunnable; // 点击超链接的时候调用
     private Runnable setChildrenForPathRunnable; // 过滤子节点的时候调用
 
+    private boolean isTreeView = true;
+    private Runnable setPanelRunnable; // 勾选“是否树结构展示”的时候调用
+
     public static void main(String[] args) {
         final Main view = new Main();
         view.setVisible(true);
@@ -58,12 +61,12 @@ public class Main extends JFrame {
         setConstraints(2, 1, true, 1.0, null, layout, headPanel);
         initHeadPanel(headPanel);
 
-        JPanel subHeadPanel1 = new JPanel();
+        final JPanel subHeadPanel1 = new JPanel();
         getContentPane().add(subHeadPanel1);
         setConstraints(2, 1, true, 1.0, null, layout, subHeadPanel1);
         initSubHeadPanel1(subHeadPanel1);
 
-        JPanel subHeadPanel = new JPanel();
+        final JPanel subHeadPanel = new JPanel();
         getContentPane().add(subHeadPanel);
         setConstraints(1, 1, true, 1.0, null, layout, subHeadPanel);
         initSubHeadPanel2(subHeadPanel);
@@ -74,16 +77,44 @@ public class Main extends JFrame {
         editorPane.setBackground(Color.LIGHT_GRAY);
 //        editorPane.setPreferredSize(new Dimension(500, 400));
 //        editorPane.setText("<h1>aa</h1><h2>bb</h2><a href=\"111\" vv=\"x\">ddddd</a>/<a href=\"111\" vv=\"x\">这种</a>");
-        JScrollPane scrollPane = new JScrollPane(editorPane);
+        final JScrollPane scrollPane = new JScrollPane(editorPane);
         getContentPane().add(scrollPane);
         setConstraints(1, 1, false, 0.7, 1.0, layout, scrollPane);
         initEditorPanel(editorPane);
 
-        JPanel panel = new JPanel();
-        getContentPane().add(panel);
-        panel.setBorder(new LineBorder(Color.black, 1, true));
-        setConstraints(1, 1, true, 0.3, 1.0, layout, panel);
-        initSidePanel(panel);
+        final JPanel sidePanel = new JPanel();
+        getContentPane().add(sidePanel);
+        sidePanel.setBorder(new LineBorder(Color.black, 1, true));
+        setConstraints(1, 1, true, 0.3, 1.0, layout, sidePanel);
+        initSidePanel(sidePanel);
+
+        final PanelOfTree panelOfTree = new PanelOfTree(zkUtil);
+        getContentPane().add(panelOfTree);
+        setConstraints(2, 1, true, 1.0, 1.0, layout, panelOfTree);
+
+        setPanelRunnable = new Runnable() {
+            @Override
+            public void run() {
+                panelOfTree.setVisible(false);
+                sidePanel.setVisible(false);
+                scrollPane.setVisible(false);
+                subHeadPanel.setVisible(false);
+                subHeadPanel1.setVisible(false);
+                if (isTreeView) {
+                    panelOfTree.setVisible(true);
+                    if (isConnected)
+                        panelOfTree.whenOpenZookeeper();
+                    else
+                        panelOfTree.whenCloseZookeeper();
+                } else {
+                    sidePanel.setVisible(true);
+                    scrollPane.setVisible(true);
+                    subHeadPanel.setVisible(true);
+                    subHeadPanel1.setVisible(true);
+                }
+            }
+        };
+        setPanelRunnable.run();
     }
 
     private void initSubHeadPanel2(JPanel subHeadPanel) {
@@ -242,9 +273,9 @@ public class Main extends JFrame {
         createButton.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (!isZKConnected())
+                if (!isZKConnected(isConnected))
                     return;
-                if (!checkRootPath())
+                if (!checkRootPath(path))
                     return;
                 if (JOptionPane.YES_OPTION != JOptionPane.showConfirmDialog(null, String.format("确定要创建[%s]节点吗？", path)))
                     return;
@@ -256,9 +287,9 @@ public class Main extends JFrame {
         createWithDataButton.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (!isZKConnected())
+                if (!isZKConnected(isConnected))
                     return;
-                if (!checkRootPath())
+                if (!checkRootPath(path))
                     return;
                 String data = textForData.getText();
                 if (JOptionPane.YES_OPTION != JOptionPane.showConfirmDialog(null, String.format("确定要创建[%s]节点，\n且将数据设置为【%s】(UTF-8)吗？", path, (data.length() > 20 ? data.substring(0, 20) + "...." : data))))
@@ -280,9 +311,9 @@ public class Main extends JFrame {
         deleteButton.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (!isZKConnected())
+                if (!isZKConnected(isConnected))
                     return;
-                if (!checkRootPath())
+                if (!checkRootPath(path))
                     return;
                 if (JOptionPane.YES_OPTION != JOptionPane.showConfirmDialog(null, String.format("确定要删除节点[%s]吗？", path)))
                     return;
@@ -293,9 +324,9 @@ public class Main extends JFrame {
         updateButton.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if (!isZKConnected())
+                if (!isZKConnected(isConnected))
                     return;
-                if (!checkRootPath())
+                if (!checkRootPath(path))
                     return;
                 String data = textForData.getText();
                 if (JOptionPane.YES_OPTION != JOptionPane.showConfirmDialog(null, String.format("确定要修改节点[%s]\n的数据为\n【%s】(UTF-8)吗？", path, (data.length() > 20 ? data.substring(0, 20) + "...." : data))))
@@ -386,13 +417,25 @@ public class Main extends JFrame {
                     // 连接成功：
                     button.setText(textUnConnect);
                     textField.setEnabled(false);
+                    setPanelRunnable.run();
                 } else {
                     zkUtil.shutdown();
                     isConnected = false;
                     // 断开连接成功：
                     button.setText(textConnect);
                     textField.setEnabled(true);
+                    setPanelRunnable.run();
                 }
+            }
+        });
+
+        final JCheckBox checkBox = new JCheckBox("是否树结构展示", true);
+        headPanel.add(checkBox);
+        checkBox.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                isTreeView = checkBox.isSelected();
+                setPanelRunnable.run();
             }
         });
     }
@@ -413,7 +456,7 @@ public class Main extends JFrame {
         viewButton.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (!isZKConnected())
+                if (!isZKConnected(isConnected))
                     return;
                 setStatForPathRunnable.run();
             }
@@ -463,7 +506,7 @@ public class Main extends JFrame {
         };
     }
 
-    private boolean checkRootPath() {
+    static boolean checkRootPath(String path) {
         if ("/".equals(path)) {
             JOptionPane.showMessageDialog(null, "不可以操作跟节点");
             return false;
@@ -471,7 +514,7 @@ public class Main extends JFrame {
         return true;
     }
 
-    private boolean isZKConnected() {
+    static boolean isZKConnected(boolean isConnected) {
         if (!isConnected) {
             JOptionPane.showMessageDialog(null, "请先连接zookeeper");
             return false;
@@ -479,7 +522,7 @@ public class Main extends JFrame {
         return true;
     }
 
-    private static void setConstraints(Integer columns, Integer rows, boolean isLastColumn, Double width, Double height, GridBagLayout layout, Component component) {
+    static void setConstraints(Integer columns, Integer rows, boolean isLastColumn, Double width, Double height, GridBagLayout layout, Component component) {
         GridBagConstraints gridBagConstraints = new GridBagConstraints();
         // 是用来控制添加进的组件的显示位置
         gridBagConstraints.fill = GridBagConstraints.BOTH;
