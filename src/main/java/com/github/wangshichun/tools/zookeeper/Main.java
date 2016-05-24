@@ -1,7 +1,6 @@
 package com.github.wangshichun.tools.zookeeper;
 
 import com.google.common.base.Splitter;
-import com.sun.deploy.util.StringUtils;
 import org.apache.zookeeper.data.Stat;
 
 import javax.swing.*;
@@ -168,7 +167,7 @@ public class Main extends JFrame {
                             String value = ch;
                             if (isDubbo) {
                                 value = URLDecoder.decode(ch, StandardCharsets.UTF_8.name());
-                                value = StringUtils.join(Splitter.fixedLength(100).splitToList(value), "<br/>");
+                                value = join(Splitter.fixedLength(100).splitToList(value), "<br/>");
                             }
                             builder.append("\n<a path=\"").append(path).append(path.endsWith("/") ? "" : "/").append(ch).append("\"").append(" href=\"\">").append(value).append("</a><br/>").append(isDubbo ? "<br/>" : "");
                         }
@@ -181,6 +180,20 @@ public class Main extends JFrame {
                 }
             }
         };
+    }
+
+    private static String join(java.util.List list, String separator) {
+        if (list == null || list.isEmpty())
+            return "";
+        StringBuilder builder = new StringBuilder();
+        separator = null == separator || separator.isEmpty() ? "," : separator;
+        for (Object obj : list) {
+            if (builder.length() > 0) {
+                builder.append(separator);
+            }
+            builder.append(obj);
+        }
+        return builder.toString();
     }
 
     private void initSidePanel(final JPanel panel) {
