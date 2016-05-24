@@ -28,9 +28,9 @@ public class Main extends JFrame {
     private String path = "/"; // 查看zk的哪个路径的数据
     private String pathFilter = ""; // 过滤子节点的表达式
     private java.util.List<String> children; // 当前路径下的子路径
-    private Runnable setStatForPathRunnable;
-    private Runnable setPathRunnable;
-    private Runnable setChildrenForPathRunnable;
+    private Runnable setStatForPathRunnable; // 查看按钮调用
+    private Runnable setPathRunnable; // 点击超链接的时候调用
+    private Runnable setChildrenForPathRunnable; // 过滤子节点的时候调用
 
     public static void main(String[] args) {
         final Main view = new Main();
@@ -313,6 +313,9 @@ public class Main extends JFrame {
         setStatForPathRunnable = new Runnable() {
             @Override
             public void run() {
+                if (path.length() > 1 && path.endsWith("/"))
+                    path = path.substring(0, path.length() - 1);
+
                 textField.setText(path);
                 textForStat.setText("");
                 textForData.setText("");
@@ -322,6 +325,7 @@ public class Main extends JFrame {
                 deleteButton.setVisible(false);
                 children = null;
 //                textField.setColumns(path.length() + 3);
+
                 Stat stat = zkUtil.exists(path);
                 if (null == stat) {
                     textForStat.setText("不存在");
