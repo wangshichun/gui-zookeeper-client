@@ -16,7 +16,9 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
+import java.util.Set;
 
 import static com.github.wangshichun.tools.zookeeper.Main.*;
 
@@ -32,6 +34,7 @@ public class PanelOfTree extends JPanel {
     private String pathFilter = ""; // 过滤子节点的表达式
     private Runnable setStatForPathRunnable; // 查看按钮（树结构中单击节点）调用
     private Runnable setChildrenForPathRunnable; // 设置子节点的时候调用
+    private JTree jTree = new JTree();
 
     PanelOfTree(ZKUtil zkUtil) {
         this.zkUtil = zkUtil;
@@ -45,8 +48,7 @@ public class PanelOfTree extends JPanel {
         initSubHeadPanel(subHeadPanel);
 
         // 树结构
-        JTree jTree = new JTree();
-        initTree(jTree);
+        initTree();
         final JScrollPane scrollPane = new JScrollPane(jTree);
         add(scrollPane);
         setConstraints(1, 1, false, 0.7, null, layout, scrollPane);
@@ -59,29 +61,31 @@ public class PanelOfTree extends JPanel {
         initSidePanel(sidePanel);
     }
 
-    private void initTree(final JTree tree) {
+    private void initTree() {
         rootNode = new DefaultMutableTreeNode("/");
         currentNode = rootNode;
-        final DefaultTreeModel defaultTreeModel = new DefaultTreeModel(rootNode);
-        tree.setRootVisible(true);
-        tree.setShowsRootHandles(true);
-        tree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
-        tree.setModel(defaultTreeModel);
+        jTree.setRootVisible(true);
+        jTree.setShowsRootHandles(false);
+        jTree.setEditable(false);
+        jTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+        jTree.setModel(new DefaultTreeModel(rootNode));
 
-//        tree.setExpandsSelectedPaths(true);
-//        tree.expandPath(new TreePath(rootNode));
+//        jTree.setExpandsSelectedPaths(true);
+//        jTree.expandPath(new TreePath(rootNode));
 
         setChildrenForPathRunnable = new Runnable() {
             @Override
             public void run() {
                 java.util.List<String> list = new ArrayList<>();
                 list.addAll(children);
+                boolean changed = false;
                 for (int i  = currentNode.getChildCount() - 1; i >= 0 ; i--) {
                     DefaultMutableTreeNode node = (DefaultMutableTreeNode) currentNode.getChildAt(i);
                     String name = (String) node.getUserObject();
                     if (list.contains(name)) {
                         list.remove(name); // 已存在的节点不变
                     } else {
+                        changed = true;
                         node.removeFromParent(); // 删除已不存在的节点
                     }
                 }
@@ -96,32 +100,34 @@ public class PanelOfTree extends JPanel {
                             break;
                         }
                     }
+                    changed = true;
                     currentNode.insert(new DefaultMutableTreeNode(name), pos);
                 }
 
                 TreePath treePath = new TreePath(currentNode.getPath());
-                if (!tree.isExpanded(treePath))
-                    tree.expandPath(treePath);
-//                else
-//                    tree.collapsePath(treePath);
+                if (!jTree.isExpanded(treePath))
+                    jTree.expandPath(treePath);
+                refreshTree(changed);
                 SwingUtilities.invokeLater(new Runnable() {
                     @Override
                     public void run() {
-                        tree.updateUI();
+                        jTree.updateUI();
                     }
                 });
             }
         };
-
-        tree.addTreeSelectionListener(new TreeSelectionListener() {
+        jTree.addTreeSelectionListener(new TreeSelectionListener() {
             @Override
             public void valueChanged(TreeSelectionEvent e) {
                 TreePath treePath = e.getPath();
-                if (null != treePath) {
-                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) tree.getLastSelectedPathComponent();
-                    if (node != null) {
+                if (null != treePath && treePath != e.getOldLeadSelectionPath()) {
+                    System.out.println(treePath + " is selected");
+                    if (treePath.getParentPath() != null && !jTree.isExpanded(treePath))
+                        jTree.expandPath(treePath);
+
+                    if (treePath.getLastPathComponent() != null) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
                         path = joinPath(new TreePath(node.getPath()));
-                        System.out.println(path);
                         currentNode = node;
                         setStatForPathRunnable.run();
                     }
@@ -129,21 +135,25 @@ public class PanelOfTree extends JPanel {
             }
         });
 
-        tree.setCellRenderer(new DefaultTreeCellRenderer() {
-            public Component getTreeCellRendererComponent(JTree tree, Object value,
-                                                          boolean sel,
-                                                          boolean expanded,
-                                                          boolean leaf, int row,
-                                                          boolean hasFocus) {
-                JLabel label = (JLabel) super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
-                pathFilter = pathFilter.toLowerCase();
-                if (pathFilter.length() > 0 && value.toString().toLowerCase().contains(pathFilter))
-                    label.setBorder(new LineBorder(Color.ORANGE, 2));
-                else
-                    label.setBorder(new LineBorder(Color.WHITE, 2));
-                return label;
+        jTree.setCellRenderer(new MyTreeCellRenderer());
+    }
+
+    public void refreshTree(final boolean changed) {
+        final Set<TreePath> expandedNodes = new LinkedHashSet();
+        int rowCount = jTree.getRowCount();
+        for (int i = 0; i < rowCount; i++) {
+            TreePath path = jTree.getPathForRow(i);
+            if (jTree.isExpanded(path)) {
+                expandedNodes.add(path);
             }
-        });
+        }
+        final TreePath[] selectedNodes = jTree.getSelectionPaths();
+        jTree.setModel(jTree.getModel());
+        for (TreePath path : expandedNodes) {
+            jTree.expandPath(path);
+        }
+        if (changed)
+            jTree.getSelectionModel().setSelectionPaths(selectedNodes == null ? new TreePath[0] : selectedNodes);
     }
 
     private void refreshParentNode() {
@@ -404,5 +414,28 @@ public class PanelOfTree extends JPanel {
         currentNode = rootNode;
         if (setChildrenForPathRunnable != null)
             setChildrenForPathRunnable.run();
+    }
+
+    private class MyTreeCellRenderer extends DefaultTreeCellRenderer {
+        public MyTreeCellRenderer() {
+            super();
+            setLeafIcon(  new ImageIcon(MyTreeCellRenderer.class.getClassLoader().getResource("icons/file_obj.gif")));
+            setOpenIcon(  new ImageIcon(MyTreeCellRenderer.class.getClassLoader().getResource("icons/fldr_obj.gif")));
+            setClosedIcon(  new ImageIcon(MyTreeCellRenderer.class.getClassLoader().getResource("icons/fldr_obj.gif")));
+        }
+
+        public Component getTreeCellRendererComponent(JTree tree, Object value,
+                                                      boolean sel,
+                                                      boolean expanded,
+                                                      boolean leaf, int row,
+                                                      boolean hasFocus) {
+            JLabel label = (JLabel) super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+            pathFilter = pathFilter.toLowerCase();
+            if (pathFilter.length() > 0 && value.toString().toLowerCase().contains(pathFilter))
+                label.setBorder(new LineBorder(Color.ORANGE, 2));
+            else
+                label.setBorder(new LineBorder(Color.WHITE, 2));
+            return label;
+        }
     }
 }
