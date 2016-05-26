@@ -45,13 +45,13 @@ public class PanelOfTree extends JPanel {
         initTree();
         final JScrollPane scrollPane = new JScrollPane(jTree);
         add(scrollPane);
-        setConstraints(1, 1, false, 0.7, null, layout, scrollPane);
+        setConstraints(1, 1, false, 0.4, null, layout, scrollPane);
 
         // 信息查看、操作
         final JPanel sidePanel = new JPanel();
         add(sidePanel);
         sidePanel.setBorder(new LineBorder(Color.black, 1, true));
-        setConstraints(1, 1, true, 0.3, 1.0, layout, sidePanel);
+        setConstraints(1, 1, true, 0.6, 1.0, layout, sidePanel);
         initSidePanel(sidePanel);
     }
 
@@ -76,12 +76,6 @@ public class PanelOfTree extends JPanel {
                 if (!jTree.isExpanded(currentNodeTreePath))
                     jTree.expandPath(currentNodeTreePath);
                 refreshTree(changed);
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        jTree.updateUI();
-                    }
-                });
             }
         };
         jTree.addTreeSelectionListener(new TreeSelectionListener() {
@@ -117,7 +111,6 @@ public class PanelOfTree extends JPanel {
 
             @Override
             public void treeWillCollapse(TreeExpansionEvent event) throws ExpandVetoException {
-                System.out.println("collapse: " + event);
             }
         });
 
@@ -173,12 +166,22 @@ public class PanelOfTree extends JPanel {
             }
         }
         final TreePath[] selectedNodes = jTree.getSelectionPaths();
-        jTree.setModel(jTree.getModel());
+        jTree.setModel(new DefaultTreeModel((DefaultMutableTreeNode) jTree.getModel().getRoot()));
         for (TreePath path : expandedNodes) {
             jTree.expandPath(path);
         }
-        if (changed)
-            jTree.getSelectionModel().setSelectionPaths(selectedNodes == null ? new TreePath[0] : selectedNodes);
+//        jTree.getSelectionModel().setSelectionMode(TreeSelectionModel.SINGLE_TREE_SELECTION);
+        if (changed) {
+            jTree.setSelectionPaths(selectedNodes == null ? new TreePath[0] : selectedNodes);
+//            jTree.getSelectionModel().setSelectionPaths(selectedNodes == null ? new TreePath[0] : selectedNodes);
+        }
+
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                jTree.updateUI();
+            }
+        });
     }
 
     private void refreshParentNode() {
@@ -450,9 +453,10 @@ public class PanelOfTree extends JPanel {
     private class MyTreeCellRenderer extends DefaultTreeCellRenderer {
         public MyTreeCellRenderer() {
             super();
-            setLeafIcon(  new ImageIcon(IconUtil.getIconImage("file_obj.gif")));
-            setOpenIcon(  new ImageIcon(IconUtil.getIconImage("fldr_obj.gif")));
-            setClosedIcon(  new ImageIcon(IconUtil.getIconImage("fldr_obj.gif")));
+            setLeafIcon(new ImageIcon(IconUtil.getIconImage("file_obj.gif")));
+            setOpenIcon(new ImageIcon(IconUtil.getIconImage("fldr_obj.gif")));
+            setClosedIcon(new ImageIcon(IconUtil.getIconImage("fldr_obj.gif")));
+            setTextSelectionColor(Color.BLUE);
         }
 
         public Component getTreeCellRendererComponent(JTree tree, Object value,
