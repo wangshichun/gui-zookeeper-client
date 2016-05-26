@@ -5,10 +5,7 @@ import org.apache.zookeeper.data.Stat;
 
 import javax.swing.*;
 import javax.swing.border.LineBorder;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.event.HyperlinkEvent;
-import javax.swing.event.HyperlinkListener;
+import javax.swing.event.*;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.html.HTML;
@@ -52,6 +49,7 @@ public class Main extends JFrame {
         setSize(850, 750);
         setExtendedState(MAXIMIZED_BOTH);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setIconImage(IconUtil.getIconImage("zookeeper_small.gif"));
 
         GridBagLayout layout = new GridBagLayout();
         setLayout(layout);
@@ -395,7 +393,7 @@ public class Main extends JFrame {
 
     private static boolean isDangDangDomain = "DANGDANG".equalsIgnoreCase(System.getenv("USERDOMAIN"));
 
-    private void initHeadPanel(JPanel headPanel) {
+    private void initHeadPanel(final JPanel headPanel) {
         headPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         JLabel label = new JLabel("zookeeper地址：");
         headPanel.add(label);
@@ -403,6 +401,50 @@ public class Main extends JFrame {
         final JTextField textField = new JTextField(isDangDangDomain ? "10.255.209.45:2181" : "host:port");
         textField.setColumns(13);
         headPanel.add(textField);
+
+        final JLabel arrowLabel = new JLabel("连接历史↓");
+        headPanel.add(arrowLabel);
+        arrowLabel.setToolTipText("点击展示连接历史");
+        arrowLabel.setBorder(new LineBorder(Color.lightGray, 1));
+        arrowLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                arrowLabel.setBorder(new LineBorder(Color.BLUE, 1));
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                arrowLabel.setBorder(new LineBorder(Color.lightGray, 1));
+            }
+        });
+
+        final PanelOfHistory history = new PanelOfHistory(Main.this, "连接历史", false);
+        history.setSize(this.getWidth() / 2, this.getHeight() / 3);
+        arrowLabel.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                history.show(e);
+            }
+        });
+        this.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (history.isVisible())
+                    history.setVisible(false);
+            }
+        });
+        history.addStringSelectListener(new PanelOfHistory.StringSelectListener() {
+            @Override
+            public boolean select(String text) {
+                if (isConnected) {
+                    JOptionPane.showMessageDialog(null, "请先断开连接，然后再选择要连接的地址");
+                    return false;
+                }
+                textField.setText(text);
+                Main.this.requestFocus();
+                return false;
+            }
+        });
 
         final String textConnect = "连接";
         final String textUnConnect = "断开连接";
@@ -414,6 +456,7 @@ public class Main extends JFrame {
                 if (textConnect.equals(button.getText())) {
                     zkUtil.init(textField.getText(), null);
                     isConnected = true;
+                    history.addNewHistoryRecord(textField.getText());
                     // 连接成功：
                     button.setText(textUnConnect);
                     textField.setEnabled(false);

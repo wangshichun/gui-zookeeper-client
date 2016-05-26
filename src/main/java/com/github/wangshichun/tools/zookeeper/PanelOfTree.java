@@ -450,9 +450,9 @@ public class PanelOfTree extends JPanel {
     private class MyTreeCellRenderer extends DefaultTreeCellRenderer {
         public MyTreeCellRenderer() {
             super();
-            setLeafIcon(  new ImageIcon(MyTreeCellRenderer.class.getClassLoader().getResource("icons/file_obj.gif")));
-            setOpenIcon(  new ImageIcon(MyTreeCellRenderer.class.getClassLoader().getResource("icons/fldr_obj.gif")));
-            setClosedIcon(  new ImageIcon(MyTreeCellRenderer.class.getClassLoader().getResource("icons/fldr_obj.gif")));
+            setLeafIcon(  new ImageIcon(IconUtil.getIconImage("file_obj.gif")));
+            setOpenIcon(  new ImageIcon(IconUtil.getIconImage("fldr_obj.gif")));
+            setClosedIcon(  new ImageIcon(IconUtil.getIconImage("fldr_obj.gif")));
         }
 
         public Component getTreeCellRendererComponent(JTree tree, Object value,
