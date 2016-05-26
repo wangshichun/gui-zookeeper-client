@@ -4,10 +4,7 @@ import org.apache.zookeeper.data.Stat;
 
 import javax.swing.*;
 import javax.swing.border.LineBorder;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import javax.swing.event.TreeSelectionEvent;
-import javax.swing.event.TreeSelectionListener;
+import javax.swing.event.*;
 import javax.swing.tree.*;
 import java.awt.*;
 import java.awt.event.FocusAdapter;
@@ -15,10 +12,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.Set;
+import java.util.*;
 
 import static com.github.wangshichun.tools.zookeeper.Main.*;
 
@@ -28,8 +22,8 @@ import static com.github.wangshichun.tools.zookeeper.Main.*;
 public class PanelOfTree extends JPanel {
     private ZKUtil zkUtil;
     private String path = "/"; // 查看zk的哪个路径的数据
-    private DefaultMutableTreeNode currentNode; // 当前选中的节点
-    private DefaultMutableTreeNode rootNode; // 根节点
+    private MyMutableTreeNode currentNode; // 当前选中的节点
+    private MyMutableTreeNode rootNode; // 根节点
     private java.util.List<String> children = new LinkedList<>(); // 当前路径下的子路径
     private String pathFilter = ""; // 过滤子节点的表达式
     private Runnable setStatForPathRunnable; // 查看按钮（树结构中单击节点）调用
@@ -62,7 +56,7 @@ public class PanelOfTree extends JPanel {
     }
 
     private void initTree() {
-        rootNode = new DefaultMutableTreeNode("/");
+        rootNode = new MyMutableTreeNode("/");
         currentNode = rootNode;
         jTree.setRootVisible(true);
         jTree.setShowsRootHandles(false);
@@ -76,37 +70,11 @@ public class PanelOfTree extends JPanel {
         setChildrenForPathRunnable = new Runnable() {
             @Override
             public void run() {
-                java.util.List<String> list = new ArrayList<>();
-                list.addAll(children);
-                boolean changed = false;
-                for (int i  = currentNode.getChildCount() - 1; i >= 0 ; i--) {
-                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) currentNode.getChildAt(i);
-                    String name = (String) node.getUserObject();
-                    if (list.contains(name)) {
-                        list.remove(name); // 已存在的节点不变
-                    } else {
-                        changed = true;
-                        node.removeFromParent(); // 删除已不存在的节点
-                    }
-                }
+                boolean changed = refreshChildren(currentNode, children);
 
-                for (int i = list.size() - 1; i >= 0; i--) { // 新增的节点按顺序插入到相应的位置
-                    String name = list.get(i);
-                    int pos = 0;
-                    for (int k = currentNode.getChildCount() - 1; k >= 0; k--) {
-                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) currentNode.getChildAt(k);
-                        if (name.compareTo((String) node.getUserObject()) > 0) {
-                            pos = k + 1;
-                            break;
-                        }
-                    }
-                    changed = true;
-                    currentNode.insert(new DefaultMutableTreeNode(name), pos);
-                }
-
-                TreePath treePath = new TreePath(currentNode.getPath());
-                if (!jTree.isExpanded(treePath))
-                    jTree.expandPath(treePath);
+                TreePath currentNodeTreePath = new TreePath(currentNode.getPath());
+                if (!jTree.isExpanded(currentNodeTreePath))
+                    jTree.expandPath(currentNodeTreePath);
                 refreshTree(changed);
                 SwingUtilities.invokeLater(new Runnable() {
                     @Override
@@ -126,7 +94,7 @@ public class PanelOfTree extends JPanel {
                         jTree.expandPath(treePath);
 
                     if (treePath.getLastPathComponent() != null) {
-                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
+                        MyMutableTreeNode node = (MyMutableTreeNode) treePath.getLastPathComponent();
                         path = joinPath(new TreePath(node.getPath()));
                         currentNode = node;
                         setStatForPathRunnable.run();
@@ -134,11 +102,68 @@ public class PanelOfTree extends JPanel {
                 }
             }
         });
+        jTree.addTreeWillExpandListener(new TreeWillExpandListener() {
+            @Override
+            public void treeWillExpand(TreeExpansionEvent event) throws ExpandVetoException {
+                MyMutableTreeNode node = (MyMutableTreeNode) event.getPath().getLastPathComponent();
+                node.setChildrenCount(null);
+                if (node.getChildCountReal() > 0) {
+                } else {
+                    String p = joinPath(event.getPath());
+                    java.util.List<String> ch = zkUtil.children(p);
+                    refreshChildren(node, ch);
+                }
+            }
+
+            @Override
+            public void treeWillCollapse(TreeExpansionEvent event) throws ExpandVetoException {
+                System.out.println("collapse: " + event);
+            }
+        });
 
         jTree.setCellRenderer(new MyTreeCellRenderer());
     }
 
-    public void refreshTree(final boolean changed) {
+    private boolean refreshChildren(MyMutableTreeNode currentNode, java.util.List<String> children) {
+        java.util.List<String> list = new ArrayList<>();
+        list.addAll(children);
+        boolean changed = false;
+        for (int i  = currentNode.getChildCountReal() - 1; i >= 0 ; i--) {
+            DefaultMutableTreeNode node = (DefaultMutableTreeNode) currentNode.getChildAt(i);
+            String name = (String) node.getUserObject();
+            if (list.contains(name)) {
+                list.remove(name); // 已存在的节点不变
+            } else {
+                changed = true;
+                node.removeFromParent(); // 删除已不存在的节点
+            }
+        }
+
+        String parentPath = joinPath(new TreePath(currentNode.getPath()));
+        for (int i = list.size() - 1; i >= 0; i--) { // 新增的节点按顺序插入到相应的位置
+            String name = list.get(i);
+            int pos = 0;
+            for (int k = currentNode.getChildCountReal() - 1; k >= 0; k--) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) currentNode.getChildAt(k);
+                if (name.compareTo((String) node.getUserObject()) > 0) {
+                    pos = k + 1;
+                    break;
+                }
+            }
+            changed = true;
+            MyMutableTreeNode myMutableTreeNode = new MyMutableTreeNode(name, null);
+            currentNode.insert(myMutableTreeNode, pos);
+
+            Stat stat = zkUtil.exists(joinPath(parentPath, name));
+            if (stat != null) {
+                myMutableTreeNode.setChildrenCount(stat.getNumChildren());
+            }
+        }
+
+        return changed;
+    }
+
+    private void refreshTree(final boolean changed) {
         final Set<TreePath> expandedNodes = new LinkedHashSet();
         int rowCount = jTree.getRowCount();
         for (int i = 0; i < rowCount; i++) {
@@ -161,7 +186,7 @@ public class PanelOfTree extends JPanel {
         if (parent.length() > 0 && currentNode.getParent() != null) {
             path = parent;
 
-            currentNode = (DefaultMutableTreeNode) currentNode.getParent();
+            currentNode = (MyMutableTreeNode) currentNode.getParent();
             refreshNode(currentNode);
         }
     }
@@ -170,6 +195,12 @@ public class PanelOfTree extends JPanel {
         if (node == null)
             return;
         setStatForPathRunnable.run();
+    }
+
+    private String joinPath(String parentPath, String name) {
+        if (parentPath.equals("/"))
+            return parentPath + name;
+        return parentPath + "/" + name;
     }
 
     private String joinPath(TreePath treePath) {
@@ -436,6 +467,35 @@ public class PanelOfTree extends JPanel {
             else
                 label.setBorder(new LineBorder(Color.WHITE, 2));
             return label;
+        }
+    }
+
+    private class MyMutableTreeNode extends DefaultMutableTreeNode {
+        private Integer childrenCount = null;
+        public MyMutableTreeNode(Object userObject) {
+            super(userObject);
+        }
+        public MyMutableTreeNode(Object userObject, Integer childrenCount) {
+            super(userObject);
+            this.childrenCount = childrenCount;
+        }
+
+        public void setChildrenCount(Integer childrenCount) {
+            this.childrenCount = childrenCount;
+        }
+
+        public int getChildCount() {
+            if (children == null || children.isEmpty()) {
+                if (childrenCount != null && childrenCount > 0)
+                    return childrenCount;
+                return 0;
+            } else {
+                return children.size();
+            }
+        }
+
+        public int getChildCountReal() {
+            return super.getChildCount();
         }
     }
 }

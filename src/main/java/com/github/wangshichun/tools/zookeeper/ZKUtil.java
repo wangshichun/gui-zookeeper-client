@@ -50,6 +50,9 @@ public class ZKUtil {
 
     public Stat exists(String path) {
         try {
+            if (!isAlreadyInit())
+                return null;
+
             return client.checkExists().forPath(path);
         } catch (Exception e) {
             e.printStackTrace();
@@ -59,18 +62,24 @@ public class ZKUtil {
 
     public String getData(String path) {
         try {
+            if (!isAlreadyInit())
+                return "请重新连接";
+
             byte[] data = client.getData().forPath(path);
             if (null == data || data.length == 0)
                 return "";
             return new String(data);
         } catch (Exception e) {
             e.printStackTrace();
+            return "错误：" + e.getMessage();
         }
-        return null;
     }
 
     public String create(String path, byte[] data) {
         try {
+            if (!isAlreadyInit())
+                return "请重新连接";
+
             if (null == data || data.length == 0)
                 data = new byte[0];
             return client.create().forPath(path, data) + " 创建成功";
@@ -84,6 +93,9 @@ public class ZKUtil {
 
     public String delete(String path) {
         try {
+            if (!isAlreadyInit())
+                return "请重新连接";
+
             client.delete().forPath(path);
             return "删除成功";
         } catch (KeeperException.NoNodeException e) {
@@ -96,6 +108,9 @@ public class ZKUtil {
 
     public String update(String path, byte[] data) {
         try {
+            if (!isAlreadyInit())
+                return "请重新连接";
+
             if (null == data || data.length == 0)
                 data = new byte[0];
             Stat stat = client.setData().forPath(path, data);
@@ -113,6 +128,9 @@ public class ZKUtil {
 
     public List<String> children(String path) {
         try {
+            if (!isAlreadyInit())
+                return new LinkedList<>();
+
             List<String> children = client.getChildren().forPath(path);
             Collections.sort(children);
             return children;
