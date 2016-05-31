@@ -100,6 +100,14 @@ public class ZKUtil {
             return "删除成功";
         } catch (KeeperException.NoNodeException e) {
             return "删除失败：节点不存在";
+        } catch (KeeperException.NotEmptyException e) {
+            try {
+                client.delete().deletingChildrenIfNeeded().forPath(path);
+                return "删除成功";
+            } catch (Exception e1) {
+                e1.printStackTrace();
+                return "删除失败：" + e1.getMessage();
+            }
         } catch (Exception e) {
             e.printStackTrace();
             return "删除失败：" + e.getMessage();
