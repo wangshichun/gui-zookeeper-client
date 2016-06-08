@@ -254,7 +254,8 @@ public class PanelOfTree extends JPanel {
         JScrollPane jScrollPane = new JScrollPane(textForData);
         panel.add(jScrollPane);
         jScrollPane.setPreferredSize(new Dimension(450, 200));
-        jScrollPane.setMaximumSize(new Dimension(450, 200));
+        jScrollPane.setMaximumSize(new Dimension(450, 300));
+        jScrollPane.setMinimumSize(new Dimension(150, 200));
         setConstraints(2, 1, true, 0.0, null, gridBagLayout, jScrollPane);
 
         // 新建按钮
