@@ -275,7 +275,7 @@ public class PanelOfTree extends JPanel {
                 if (name == null || name.length() == 0)
                     return;
 
-                name = path + "/" + name;
+                name = (path.equals("/") ? "" : path) + "/" + name;
                 if (JOptionPane.YES_OPTION != JOptionPane.showConfirmDialog(null, String.format("确定要创建[%s]节点吗？", name)))
                     return;
 
